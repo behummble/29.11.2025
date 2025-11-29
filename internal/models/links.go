@@ -1,0 +1,14 @@
+package models
+
+type VerifyLinksRequest struct {
+	Links []string
+}
+
+type VerifyLinksResponse struct {
+	Resp map[string]string
+	Links_num int
+}
+
+type LinksPackageRequest struct {
+	Links_list []int
+}

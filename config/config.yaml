@@ -1,0 +1,11 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+
+log:
+  path: "./app.log"
+  level: 1
+
+storage:
+  links_size: 10000
+  cache_size: 7000
