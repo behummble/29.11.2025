@@ -1,0 +1,117 @@
+openapi: 3.0.0
+info:
+  title: Links Verification API
+  description: API for verifying links and generating PDF reports
+  version: 1.0.0
+
+paths:
+  /links:
+    post:
+      summary: Verify multiple links
+      description: Verifies a list of links and returns verification results
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyLinksRequest'
+      responses:
+        '200':
+          description: Successful verification
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyLinksResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /links/list:
+    post:
+      summary: Generate PDF report for links
+      description: Generates a PDF report containing link verification results for specified link IDs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinksPackageRequest'
+      responses:
+        '200':
+          description: PDF file generated successfully
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Links not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    VerifyLinksRequest:
+      type: object
+      required:
+        - links
+      properties:
+        links:
+          type: array
+          items:
+            type: string
+          description: Array of URLs to verify
+          example: ["https://example.com", "https://google.com"]
+
+    VerifyLinksResponse:
+      type: object
+      properties:
+        links:
+          type: object
+          additionalProperties:
+            type: string
+          description: Hash table with URL as key and verification status as value
+          example:
+            "https://example.com": "verified"
+            "https://google.com": "broken"
+        links_num:
+          type: integer
+          description: Number of links processed
+          example: 2
+
+    LinksPackageRequest:
+      type: object
+      required:
+        - Links_list
+      properties:
+        Links_list:
+          type: array
+          items:
+            type: integer
+          description: Array of link IDs to include in PDF report
+          example: [1, 2, 3]
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        code:
+          type: integer
+          description: Error code
+        timestamp:
+          type: string
+          format: date-time
+          description: When the error occurred

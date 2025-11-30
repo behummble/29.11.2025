@@ -28,7 +28,7 @@ type StorageConfig struct {
 	CacheSize int `yaml:"cache_size"`
 }
 
-func MustLoad() *Config {
+func MustLoad() Config {
 	path := loadPath()
 	if path == "" {
 		panic("Can`t read config file")
@@ -48,7 +48,7 @@ func loadPath() string {
 	return path
 }
 
-func loadConfig(path string) *Config {
+func loadConfig(path string) Config {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		panic("config file does not exist: " + path)
 	}
@@ -59,5 +59,5 @@ func loadConfig(path string) *Config {
 		panic("cannot read config: " + err.Error())
 	}
 	
-	return &cfg
+	return cfg
 }

@@ -12,48 +12,43 @@ import (
 
 type Storage struct {
 	links map[int][]string
-	cache  *cache
+	cache  *lruCache
 	log *slog.Logger
 	id int
-}
-
-type cache struct {
-	cache map[string]string
-	mutex *sync.RWMutex
 }
 
 func NewStorage(cfg config.StorageConfig, log *slog.Logger) *Storage {
 	return &Storage{
 		links: make(map[int][]string, cfg.LinksSize),
-		cache: newCache(cfg.CacheSize),
+		cache: newLRUCache(cfg.CacheSize),
 		log: log,
 	}
 }
 
-func(s *Storage) WriteLinksPackage(links []string, newLinks map[string]string) (int, error) {
+func(s *Storage) WriteLinksPackage(links []string) (int, error) {
 	for i := 0; i < len(links); i++ {
 		links[i] = strings.ToLower(links[i])
 	}
 	s.id++
 	s.links[s.id] = links
-	go func() {
-		for key, value := range newLinks {
-			s.cache.put(key, value)
-		}
-	}()
 	return s.id, nil
 }
 
-func(s *Storage) Links(packageID int) (map[string]string, error) {
+func(s *Storage) Links(packageID int) (map[string]string, []string, error) {
 	links, ok := s.links[packageID]
 	if !ok {
-		return nil, errors.New("PackageNotFound")
+		return nil, nil, errors.New("PackageNotFound")
 	}
 	res := make(map[string]string, len(links))
-	for _, v := range links {
-		res[v], _ = s.cache.get(v)
+	notInCache := make([]string, 0, len(links))
+	for _, link := range links {
+		value, ok := s.cache.get(link)
+		if !ok {
+			notInCache = append(notInCache, link)
+		}
+		res[link] = value
 	}
-	return res, nil
+	return res, notInCache, nil
 }
 
 func(s *Storage) LinksStatus(links []string) map[string]string {
@@ -75,29 +70,13 @@ func(s *Storage) ValidateCache(newValues map[string]string) {
 }
 
 func(s *Storage) AllLinks() map[string]string {
-	return s.cache.cache
+	return s.cache.allKeys()
 }
 
-func newCache(capacity int) *cache {
-	if capacity <= 0 {
-		panic("Cache capacity must be positive")
+func(s *Storage) UpdateLinksInfo(links map[string]string) {
+	for key, value := range links {
+		s.cache.put(key, value)
 	}
-	return &cache{
-		cache:     make(map[string]string, capacity),
-	}
-}
-
-func (c *cache) get(key string) (string, bool) {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-	res, ok := c.cache[key]
-	return res, ok
-}
-
-func (c *cache) put(key, value string) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	c.cache[key] = value
 }
 
 type lruCache struct {
@@ -112,7 +91,7 @@ type entry struct {
 	value string
 }
 
-func NewLRUCache(capacity int) *lruCache {
+func newLRUCache(capacity int) *lruCache {
 	if capacity <= 0 {
 		panic("LRU cache capacity must be positive")
 	}
@@ -165,25 +144,6 @@ func (lru *lruCache) removeElement(elem *list.Element) {
 	delete(lru.cache, kv.key)
 }
 
-func (lru *lruCache) remove(key string) bool {
-	lru.mutex.Lock()
-	defer lru.mutex.Unlock()
-
-	if elem, exists := lru.cache[key]; exists {
-		lru.removeElement(elem)
-		return true
-	}
-	return false
-}
-
-func (lru *lruCache) contains(key string) bool {
-	lru.mutex.RLock()
-	defer lru.mutex.RUnlock()
-	
-	_, exists := lru.cache[key]
-	return exists
-}
-
 func (lru *lruCache) len() int {
 	lru.mutex.RLock()
 	defer lru.mutex.RUnlock()
@@ -191,21 +151,10 @@ func (lru *lruCache) len() int {
 	return lru.evictList.Len()
 }
 
-func (lru *lruCache) clear() {
-	lru.mutex.Lock()
-	defer lru.mutex.Unlock()
-	
-	lru.cache = make(map[string]*list.Element)
-	lru.evictList.Init()
-}
-
-func (lru *lruCache) keys() []string {
-	lru.mutex.RLock()
-	defer lru.mutex.RUnlock()
-	
-	keys := make([]string, 0, lru.evictList.Len())
-	for elem := lru.evictList.Front(); elem != nil; elem = elem.Next() {
-		keys = append(keys, elem.Value.(*entry).key)
+func (lru *lruCache) allKeys() map[string]string {
+	res := make(map[string]string, lru.len())
+	for key, elem := range lru.cache {
+		res[key] = elem.Value.(*entry).value
 	}
-	return keys
+	return res
 }

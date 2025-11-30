@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/behummble/29-11-2025/internal/models"
@@ -18,23 +20,42 @@ const (
 
 type LinkService struct {
 	log *slog.Logger
+	client *http.Client
 	storage Storage
-	shutdown <-chan struct{}
+	shutdown chan struct{}
+}
+
+type siteStatus struct {
+	link string
+	status string
 }
 
 type Storage interface {
-	WriteLinksPackage(links []string, newLinks map[string]string) (int, error)
-	Links(packetdID int) (map[string]string, error)
+	WriteLinksPackage(links []string, ) (int, error)
+	Links(packetdID int) (map[string]string, []string, error)
 	LinksStatus(links []string) map[string]string
 	ValidateCache(newValues map[string]string)
 	AllLinks() map[string]string
+	UpdateLinksInfo(links map[string]string)
 }
 
-func NewService(storage Storage, log *slog.Logger, shutdown <-chan struct{}) *LinkService {
+func NewService(storage Storage, log *slog.Logger) *LinkService {
 	return &LinkService{
 		log: log,
+		client: &http.Client{
+			Timeout: 10 * time.Second,
+		},
 		storage: storage,
-		shutdown: shutdown,
+		shutdown: make(chan struct{}, 1),
+	}
+}
+
+func(svc *LinkService) Shutdown(ctx context.Context) error {
+	select {
+	case <- ctx.Done():
+		return context.Cause(ctx)
+	case svc.shutdown <- struct{}{}:
+		return nil
 	}
 }
 
@@ -58,22 +79,30 @@ func(svc *LinkService) VerifyLinks(ctx context.Context, data []byte) (models.Ver
 	
 	linksInfo := make(map[string]string, len(linksRequest.Links))
 	newLinks := make(map[string]string, len(linksRequest.Links) - len(cachedLinks))
+	notInCache := make([]string, 0, len(linksInfo))
 	for _, link := range linksRequest.Links {
-		status := cachedLinks[link]
 		if _, ok := cachedLinks[link]; !ok {
-			status = linkStatus(link, svc.log)
-			newLinks[link] = status
+			notInCache = append(notInCache, link)
 		}
-		linksInfo[link] = status
 	}
 
-	id, err := svc.storage.WriteLinksPackage(linksRequest.Links, newLinks)
+	status := make(chan siteStatus, 10)
+	svc.linksStatus(status, notInCache)
+	
+	for siteStatus := range status {
+		linksInfo[siteStatus.link] = siteStatus.status
+		newLinks[siteStatus.link] = siteStatus.status
+	}
+
+	id, err := svc.storage.WriteLinksPackage(linksRequest.Links)
 	if err != nil {
 		return models.VerifyLinksResponse{}, err
 	}
 
+	svc.storage.UpdateLinksInfo(newLinks)
+
 	res := models.VerifyLinksResponse{
-		Resp: linksInfo,
+		Links: linksInfo,
 		Links_num: id,
 	}
 
@@ -96,10 +125,11 @@ func(svc *LinkService) PackageLinks(ctx context.Context, data []byte) ([]byte, e
 		return nil, errors.New("EmptyBody")
 	}
 
-	res := make(map[string]string, 0)
-
+	res := make(map[string]string, 1024)
+	notInCacheLinks := make(map[string]string, 1024)
+	linksToUpdate := make([]string, 0, 1024)
 	for _, id := range packageLinksRequest.Links_list {
-		links, err := svc.storage.Links(id)
+		links, notInCache, err := svc.storage.Links(id)
 		if err != nil {
 			svc.log.Error(
 				"LinksReadingError", 
@@ -108,12 +138,28 @@ func(svc *LinkService) PackageLinks(ctx context.Context, data []byte) ([]byte, e
 			)
 			return nil, err
 		}
-		for k, v := range links {
-			if _, ok := res[k]; !ok {
-				res[k] = v
+		for link, status := range links {
+			if _, ok := res[link]; !ok {
+				res[link] = status
 			}
 		}
+		linksToUpdate = append(linksToUpdate, notInCache...)
+		/*for _, notCachedLink := range notInCache {
+			status := linkStatus(notCachedLink, svc.log)
+			res[notCachedLink] = status
+			notInCacheLinks[notCachedLink] = status
+		} */
 	}
+
+	status := make(chan siteStatus, 10)
+	svc.linksStatus(status, linksToUpdate)
+	
+	for siteStatus := range status {
+		res[siteStatus.link] = siteStatus.status
+		notInCacheLinks[siteStatus.link] = siteStatus.status
+	}
+
+	svc.storage.UpdateLinksInfo(notInCacheLinks)
 
 	payload, err := json.Marshal(res)
 	if err != nil {
@@ -129,9 +175,11 @@ func(svc *LinkService) PackageLinks(ctx context.Context, data []byte) ([]byte, e
 
 func(svc *LinkService) ValidateCache() {
 	ticker := time.Tick(15 *time.Minute)
+	loop:
 	for {
 		select {
 		case <-ticker:
+			svc.log.Info("Starting validate cache")
 			allLinks := svc.storage.AllLinks()
 			newLinks := make(map[string]string, len(allLinks)/6)
 			for key, value := range allLinks {
@@ -142,12 +190,13 @@ func(svc *LinkService) ValidateCache() {
 			}
 			svc.storage.ValidateCache(newLinks)
 		case <-svc.shutdown:
-			return
+			break loop
 		}
 	}
 }
 
 func linkStatus(link string, log *slog.Logger) string {
+
 	resp, err := http.Get(link)
 	if err != nil {
 		log.Error("Ping site error", slog.String("url", link), slog.String("error", err.Error()))
@@ -161,4 +210,34 @@ func linkStatus(link string, log *slog.Logger) string {
 	}
 	
 	return statusAvaliable
+}
+
+func(svc *LinkService) linksStatus(status chan<- siteStatus, links []string) {
+	var wg sync.WaitGroup
+	wg.Add(len(links))
+	for _, link := range links {
+
+		go func(url string) {
+			defer wg.Done()
+			resp, err := svc.client.Get(fmt.Sprintf("http://%s", link))
+			siteStatus := siteStatus{
+				link: link,
+			}
+			if err != nil {
+				svc.log.Error("Ping site error", slog.String("url", link), slog.String("error", err.Error()))
+				siteStatus.status = statusNotAvaliable
+			}
+			
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				siteStatus.status = statusNotAvaliable
+			}
+			status<- siteStatus
+
+		}(link)
+	}
+	
+	wg.Wait()
+	close(status)
 }

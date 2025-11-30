@@ -1,0 +1,89 @@
+# Website Status Checker
+
+Веб-сервер на Go для проверки доступности сайтов. Возвращает статус сайтов (доступен/не доступен) с использованием кэширования.
+
+## 🚀 Быстрый старт
+
+### Через Docker (рекомендуется)
+```bash
+# Сборка и запуск
+docker build -t website-checker .
+docker run -p 8080:8080 website-checker
+
+# Или с готовым образом
+docker run -p 8080:8080 yourname/website-checker
+```
+
+### Напрямую
+```bash
+# Сборка
+go build -o website-checker .
+
+# Запуск
+./website-checker
+```
+
+## ⚙️ Конфигурация
+
+Создайте `config.yaml`:
+```yaml
+server:
+  address: "localhost"
+  port: 8080
+
+log:
+  level: 1
+  file: "logs/app.log"
+
+storage:
+  links_size: 1000
+  cache_size: 800
+```
+
+## 📡 Использование
+
+### Проверить один сайт
+```bash
+curl "http://localhost:8080/check?url=https://google.com"
+```
+
+### Проверить несколько сайтов
+```bash
+curl -X POST "http://localhost:8080/check" \
+  -H "Content-Type: application/json" \
+  -d '["https://google.com", "https://github.com"]'
+```
+
+## ✨ Особенности
+
+- **Кэширование LRU** - результаты проверок кэшируются
+- **Валидация кэша** - автоматическое обновление устаревших данных
+- **Гибкая настройка** - конфигурация через YAML-файл
+- **Docker поддержка** - готовые образы для развертывания
+- **Службы ОС** - запуск как служба Windows/Linux
+- **Настраиваемое логирование** - разные уровни детализации
+
+## 🐳 Docker
+
+```bash
+# Сборка
+docker build -t website-checker .
+
+# Запуск с своим конфигом
+docker run -p 8080:8080 -v ./config.yaml:/app/config.yaml website-checker
+```
+
+## 🔧 Как системная служба
+
+### Linux
+```bash
+sudo cp website-checker.service /etc/systemd/system/
+sudo systemctl enable website-checker
+sudo systemctl start website-checker
+```
+
+### Windows
+```cmd
+sc create WebsiteChecker binPath= "C:\path\to\website-checker.exe"
+sc start WebsiteChecker
+```

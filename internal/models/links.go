@@ -5,7 +5,7 @@ type VerifyLinksRequest struct {
 }
 
 type VerifyLinksResponse struct {
-	Resp map[string]string
+	Links map[string]string
 	Links_num int
 }
 

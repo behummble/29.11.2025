@@ -2,29 +2,19 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"os/signal"
-	"time"
 	"syscall"
+	"time"
 
-	"github.com/behummble/29-11-2025/internal/config"
-	"github.com/behummble/29-11-2025/internal/handlers/http"
-	"github.com/behummble/29-11-2025/internal/service"
-	"github.com/behummble/29-11-2025/internal/storage"
 	"github.com/behummble/29-11-2025/internal/app"
+	"github.com/behummble/29-11-2025/internal/config"
 	svc "github.com/kardianos/service"
 )
 
 func main() {
-	app := app.NewApp()
-	s, err := registerService(app)
-	if err != nil {
-		// not service
-		app.Run()
-	} else {
-		s.Run()
-	}
 	ctx, stop := signal.NotifyContext(
 		context.Background(), 
 		os.Interrupt,
@@ -35,18 +25,18 @@ func main() {
 	defer stop()
 	cfg := config.MustLoad()
 	log := newLog(cfg.Log)
-	storage := storage.NewStorage(cfg.Storage, log)
-	log.Info("Storage init")
-	shutdownChan := make(chan struct{},1)
-	service := service.NewService(storage, log, shutdownChan)
-	server := http.NewServer(ctx, log, cfg.Server, service)
-	go server.Start()
-	log.Info("Server is Up")
-	<- ctx.Done()
-	shutdownContext, cancel := context.WithTimeout(context.Background(), 10 * time.Second)
-	defer cancel()
-	server.Shutdown(shutdownContext)
-	log.Info("Server is Down")
+
+	app := app.NewApp(cfg, log)
+	s, err := registerService(app)
+	if err != nil {
+		app.Run()
+		<- ctx.Done()
+		shutdownContext, cancel := context.WithTimeout(context.Background(), 10 * time.Second)
+		defer cancel()
+		app.Shutdown(shutdownContext)
+	} else {
+		s.Run()
+	}
 }
 
 func newLog(config config.LogConfig) *slog.Logger {
@@ -69,11 +59,18 @@ func newLog(config config.LogConfig) *slog.Logger {
 }
 
 func registerService(app *app.App) (svc.Service, error) {
+	if len(os.Args) <= 1 {
+		return nil, errors.New("NotEnoughArguments")
+	}
 	svcConfig := &svc.Config{
-		Name:        "GoServiceExampleSimple",
-		DisplayName: "Go Service Example",
-		Description: "This is an example Go service.",
+		Name:        "links_verifier",
+		DisplayName: "Links verifier service",
+		Description: "Service verify sites condition",
 	}
 
-	return  svc.New(app, svcConfig)
+	serv, err := svc.New(app, svcConfig)
+	if err != nil {
+		return serv, err
+	}
+	return serv, svc.Control(serv, os.Args[1])
 }

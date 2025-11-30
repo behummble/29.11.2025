@@ -8,8 +8,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"strconv"
-	"sync/atomic"
 	"time"
 
 	"github.com/behummble/29-11-2025/internal/config"
@@ -20,7 +18,6 @@ type Server struct {
 	log *slog.Logger
 	server *http.Server
 	service Service
-	isClosed atomic.Bool
 }
 
 type Service interface {
@@ -28,7 +25,7 @@ type Service interface {
 	PackageLinks(ctx context.Context, data []byte) ([]byte, error)
 }
 
-func NewServer(ctx context.Context, log *slog.Logger, cfg config.ServerConfig, service Service) *Server {
+func NewServer(log *slog.Logger, cfg config.ServerConfig, service Service) *Server {
 	server := &Server{
 		log: log,
 		service: service,
@@ -50,12 +47,8 @@ func(s *Server) Start() {
     }
 }
 
-func(s *Server) Shutdown(ctx context.Context) {
-	s.isClosed.CompareAndSwap(true, false)
-}
-
-func(s *Server) Restart() {
-	s.isClosed.CompareAndSwap(false, true)
+func(s *Server) Shutdown(ctx context.Context) error {
+	return s.server.Shutdown(ctx)
 }
 
 func(s *Server) GetHandler() http.Handler {
@@ -63,10 +56,6 @@ func(s *Server) GetHandler() http.Handler {
 }
 
 func(s *Server) VerifyLinks(writer http.ResponseWriter, request *http.Request) {
-	if s.isClosed.Load() {
-		writer.WriteHeader(http.StatusServiceUnavailable)
-		return
-	}
 	ctx, cancel := context.WithTimeout(request.Context(), 30 * time.Second)
 	defer cancel()
 	data, err := executeRequestBody(request, s.log)
@@ -96,10 +85,6 @@ func(s *Server) VerifyLinks(writer http.ResponseWriter, request *http.Request) {
 }
 
 func(s *Server) LinksReport(writer http.ResponseWriter, request *http.Request) {
-	if s.isClosed.Load() {
-		writer.WriteHeader(http.StatusServiceUnavailable)
-		return
-	}
 	ctx, cancel := context.WithTimeout(request.Context(), 30 * time.Second)
 	defer cancel()
 	data, err := executeRequestBody(request, s.log)
@@ -170,18 +155,4 @@ func prepareResponse[T any](m T, log *slog.Logger) []byte {
 	}
 
 	return res
-}
-
-func getID(r *http.Request) (int, error) {
-	idStr := r.PathValue("id")
-	if idStr == "" {
-		return 0, errors.New("ParameterNotFound")
-	}
-
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		return 0, err
-	}
-
-	return id, nil
 }
