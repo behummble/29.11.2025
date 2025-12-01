@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/behummble/29-11-2025/internal/models"
+	"github.com/jung-kurt/gofpdf"
 )
 
 const (
@@ -144,11 +146,6 @@ func(svc *LinkService) PackageLinks(ctx context.Context, data []byte) ([]byte, e
 			}
 		}
 		linksToUpdate = append(linksToUpdate, notInCache...)
-		/*for _, notCachedLink := range notInCache {
-			status := linkStatus(notCachedLink, svc.log)
-			res[notCachedLink] = status
-			notInCacheLinks[notCachedLink] = status
-		} */
 	}
 
 	status := make(chan siteStatus, 10)
@@ -161,16 +158,7 @@ func(svc *LinkService) PackageLinks(ctx context.Context, data []byte) ([]byte, e
 
 	svc.storage.UpdateLinksInfo(notInCacheLinks)
 
-	payload, err := json.Marshal(res)
-	if err != nil {
-		svc.log.Error(
-			"LinksReadingError", 
-			slog.String("component", "json/encoding"),
-			slog.Any("error", err),
-		)
-		return nil, err
-	}
-	return payload, err
+	return svc.createPDF(res)
 }
 
 func(svc *LinkService) ValidateCache() {
@@ -227,6 +215,8 @@ func(svc *LinkService) linksStatus(status chan<- siteStatus, links []string) {
 			if err != nil {
 				svc.log.Error("Ping site error", slog.String("url", link), slog.String("error", err.Error()))
 				siteStatus.status = statusNotAvaliable
+				status<- siteStatus
+				return
 			}
 			
 			defer resp.Body.Close()
@@ -241,4 +231,34 @@ func(svc *LinkService) linksStatus(status chan<- siteStatus, links []string) {
 	
 	wg.Wait()
 	close(status)
+}
+
+func(svc *LinkService) createPDF(links map[string]string) ([]byte, error) {
+	payload, err := json.Marshal(links)
+	if err != nil {
+		svc.log.Error(
+			"LinksReadingError", 
+			slog.String("component", "json/encoding"),
+			slog.Any("error", err),
+		)
+		return nil, err
+	}
+
+	pdf := gofpdf.New("P", "mm", "A4", "")
+	pdf.AddPage()
+	pdf.SetFont("Arial", "B", 12)
+	pdf.Cell(40, 10, string(payload))
+	buffer := bytes.NewBuffer(payload)
+	err = pdf.Output(buffer)
+	defer pdf.Close()
+	if err != nil {
+		svc.log.Error(
+			"CreatePDFFileError", 
+			slog.String("component", "pdf"),
+			slog.Any("error", err),
+		)
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
 }

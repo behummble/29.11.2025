@@ -80,7 +80,7 @@ func(s *Server) VerifyLinks(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 	bytes := prepareResponse(res, s.log)
-	writer.WriteHeader(http.StatusCreated)
+	writer.WriteHeader(http.StatusOK)
 	writer.Write(bytes)
 }
 
@@ -108,10 +108,9 @@ func(s *Server) LinksReport(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 	s.log.Info("Recive request to get all question")
-	bytes := prepareResponse(res, s.log)
-	writer.WriteHeader(http.StatusOK)
-	writer.Header().Add("Content-type", "application/pdf")
-	writer.Write(bytes)
+	writer.Header().Set("Content-Type", "application/pdf")
+	writer.WriteHeader(http.StatusOK)	
+	writer.Write(res)
 }
 
 func newMux(s *Server) *http.ServeMux {
