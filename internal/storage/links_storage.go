@@ -1,11 +1,11 @@
 package storage
 
 import (
-	"errors"
+	"container/list"
+	"fmt"
 	"log/slog"
 	"strings"
 	"sync"
-	"container/list"
 
 	"github.com/behummble/29-11-2025/internal/config"
 )
@@ -37,7 +37,7 @@ func(s *Storage) WriteLinksPackage(links []string) (int, error) {
 func(s *Storage) Links(packageID int) (map[string]string, []string, error) {
 	links, ok := s.links[packageID]
 	if !ok {
-		return nil, nil, errors.New("PackageNotFound")
+		return nil, nil, fmt.Errorf("PackageNotFound: %d", packageID)
 	}
 	res := make(map[string]string, len(links))
 	notInCache := make([]string, 0, len(links))

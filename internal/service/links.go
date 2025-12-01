@@ -83,8 +83,11 @@ func(svc *LinkService) VerifyLinks(ctx context.Context, data []byte) (models.Ver
 	newLinks := make(map[string]string, len(linksRequest.Links) - len(cachedLinks))
 	notInCache := make([]string, 0, len(linksInfo))
 	for _, link := range linksRequest.Links {
-		if _, ok := cachedLinks[link]; !ok {
+		status, ok := cachedLinks[link]
+		if !ok {
 			notInCache = append(notInCache, link)
+		} else {
+			linksInfo[link] = status
 		}
 	}
 
@@ -234,22 +237,16 @@ func(svc *LinkService) linksStatus(status chan<- siteStatus, links []string) {
 }
 
 func(svc *LinkService) createPDF(links map[string]string) ([]byte, error) {
-	payload, err := json.Marshal(links)
-	if err != nil {
-		svc.log.Error(
-			"LinksReadingError", 
-			slog.String("component", "json/encoding"),
-			slog.Any("error", err),
-		)
-		return nil, err
-	}
-
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.AddPage()
 	pdf.SetFont("Arial", "B", 12)
-	pdf.Cell(40, 10, string(payload))
-	buffer := bytes.NewBuffer(payload)
-	err = pdf.Output(buffer)
+	for link, status := range links {
+		pdf.Cell(0, 10, fmt.Sprintf("%s:%s", link, status))
+    	pdf.Ln(10) 
+	}
+
+	buffer := bytes.NewBuffer([]byte{})
+	err := pdf.Output(buffer)
 	defer pdf.Close()
 	if err != nil {
 		svc.log.Error(
