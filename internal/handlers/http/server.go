@@ -65,7 +65,7 @@ func(s *Server) VerifyLinks(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	s.log.Info("Recive request cerify links")
+	s.log.Info("Recive request verify links")
 
 	if len(data) == 0 {
 		writer.WriteHeader(http.StatusBadRequest)
@@ -107,7 +107,6 @@ func(s *Server) LinksReport(writer http.ResponseWriter, request *http.Request) {
 		fmt.Fprint(writer, err.Error())
 		return
 	}
-	s.log.Info("Recive request to get all question")
 	writer.Header().Set("Content-Type", "application/pdf")
 	writer.WriteHeader(http.StatusOK)	
 	writer.Write(res)
