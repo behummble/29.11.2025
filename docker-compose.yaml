@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  questions_answers:
+    container_name: link_verifier
+    build:
+      context: .
+      dockerfile: ./build/Dockerfile
+    ports:
+      - "8080:8080"
