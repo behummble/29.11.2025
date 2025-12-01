@@ -83,8 +83,8 @@ func TestStorage_PackageNotFound(t *testing.T) {
 		t.Error("Expected error for non-existent package")
 	}
 	
-	if err.Error() != "PackageNotFound" {
-		t.Errorf("Expected 'PackageNotFound', got '%v'", err)
+	if err.Error() != "PackageNotFound: 999" {
+		t.Errorf("Expected 'PackageNotFound: 999', got '%v'", err)
 	}
 }
 

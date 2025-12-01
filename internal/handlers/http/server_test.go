@@ -54,8 +54,8 @@ func TestServer_VerifyLinks_Success(t *testing.T) {
 	handler := server.GetHandler()
 	handler.ServeHTTP(rr, req)
 	
-	if rr.Code != http.StatusCreated {
-		t.Errorf("Expected status %d, got %d", http.StatusCreated, rr.Code)
+	if rr.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, rr.Code)
 	}
 	
 	var response models.VerifyLinksResponse

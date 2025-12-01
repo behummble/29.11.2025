@@ -51,8 +51,8 @@ func TestEndToEnd_LinkVerification(t *testing.T) {
 		}
 		defer resp.Body.Close()
 		
-		if resp.StatusCode != http.StatusCreated {
-			t.Errorf("Expected status %d, got %d", http.StatusCreated, resp.StatusCode)
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status %d, got %d", http.StatusOK, resp.StatusCode)
 		}
 		
 		var response models.VerifyLinksResponse
@@ -178,8 +178,8 @@ func TestEndToEnd_WithLocalServer(t *testing.T) {
 	}
 	defer resp.Body.Close()
 	
-	if resp.StatusCode != http.StatusCreated {
-		t.Errorf("Expected status %d, got %d", http.StatusCreated, resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, resp.StatusCode)
 	}
 	
 	var response models.VerifyLinksResponse

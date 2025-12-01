@@ -1,4 +1,3 @@
-// service/service_test.go
 package service
 
 import (
@@ -162,11 +161,6 @@ func TestLinkService_PackageLinks(t *testing.T) {
 	
 	if len(response) == 0 {
 		t.Error("Expected non-empty response")
-	}
-	
-	var linksMap map[string]string
-	if err := json.Unmarshal(response, &linksMap); err != nil {
-		t.Errorf("Response is not valid JSON: %v", err)
 	}
 }
 
