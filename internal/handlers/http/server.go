@@ -65,7 +65,7 @@ func(s *Server) VerifyLinks(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	s.log.Info("Recive request to create question")
+	s.log.Info("Recive request cerify links")
 
 	if len(data) == 0 {
 		writer.WriteHeader(http.StatusBadRequest)
@@ -94,7 +94,7 @@ func(s *Server) LinksReport(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	s.log.Info("Recive request to create question")
+	s.log.Info("Recive request to get link package report")
 
 	if len(data) == 0 {
 		writer.WriteHeader(http.StatusBadRequest)
