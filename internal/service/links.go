@@ -172,14 +172,20 @@ func(svc *LinkService) ValidateCache() {
 		case <-ticker:
 			svc.log.Info("Starting validate cache")
 			allLinks := svc.storage.AllLinks()
-			newLinks := make(map[string]string, len(allLinks)/6)
-			for key, value := range allLinks {
-				status := linkStatus(key, svc.log)
-				if status != value {
-					newLinks[key] = status
+			status := make(chan siteStatus, 10)
+			links := make([]string, 0, len(allLinks))
+			for key := range allLinks {
+				links = append(links, key)
+			}
+			svc.linksStatus(status, links)
+			linksToUpdate := make(map[string]string, len(allLinks)/6)
+			for siteStatus := range status {
+				if status := allLinks[siteStatus.link]; status != siteStatus.status {
+					linksToUpdate[siteStatus.link] = siteStatus.status
 				}
 			}
-			svc.storage.ValidateCache(newLinks)
+			
+			svc.storage.ValidateCache(linksToUpdate)
 		case <-svc.shutdown:
 			break loop
 		}
