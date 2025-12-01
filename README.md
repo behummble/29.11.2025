@@ -32,8 +32,8 @@ server:
   port: 8080
 
 log:
-  level: 1
-  file: "logs/app.log"
+  level: 0
+  file: "./app.log"
 
 storage:
   links_size: 1000
@@ -42,16 +42,11 @@ storage:
 
 ## 📡 Использование
 
-### Проверить один сайт
+### Проверить сайты
 ```bash
-curl "http://localhost:8080/check?url=https://google.com"
-```
-
-### Проверить несколько сайтов
-```bash
-curl -X POST "http://localhost:8080/check" \
+curl -X POST "http://localhost:8080/links" \
   -H "Content-Type: application/json" \
-  -d '["https://google.com", "https://github.com"]'
+  -d '["google.com", "github.com"]'
 ```
 
 ## ✨ Особенности
@@ -67,10 +62,7 @@ curl -X POST "http://localhost:8080/check" \
 
 ```bash
 # Сборка
-docker build -t website-checker .
-
-# Запуск с своим конфигом
-docker run -p 8080:8080 -v ./config.yaml:/app/config.yaml website-checker
+docker-compose up -d
 ```
 
 ## 🔧 Как системная служба
@@ -84,6 +76,6 @@ sudo systemctl start website-checker
 
 ### Windows
 ```cmd
-sc create WebsiteChecker binPath= "C:\path\to\website-checker.exe"
-sc start WebsiteChecker
+sc create link_verifier binPath= "C:\path\to\link_verifier.exe"
+sc start link_verifier
 ```
