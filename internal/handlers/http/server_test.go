@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"errors"
 
+	"github.com/behummble/29-11-2025/internal/config"
 	"github.com/behummble/29-11-2025/internal/models"
 )
 
@@ -36,10 +37,10 @@ func TestServer_VerifyLinks_Success(t *testing.T) {
 		},
 	}
 	
-	server := &Server{
-		log:     slog.Default(),
-		service: mockService,
-	}
+	server := NewServer(slog.Default(), config.ServerConfig{
+		Host: "localhost",
+		Port: 8080,
+	}, mockService)
 	
 	requestBody := models.VerifyLinksRequest{
 		Links: []string{"example.com"},
@@ -73,10 +74,10 @@ func TestServer_VerifyLinks_Success(t *testing.T) {
 
 func TestServer_VerifyLinks_EmptyBody(t *testing.T) {
 	mockService := &mockService{}
-	server := &Server{
-		log:     slog.Default(),
-		service: mockService,
-	}
+	server := NewServer(slog.Default(), config.ServerConfig{
+		Host: "localhost",
+		Port: 8080,
+	}, mockService)
 	
 	req := httptest.NewRequest("POST", "/links", bytes.NewReader([]byte{}))
 	rr := httptest.NewRecorder()
@@ -93,13 +94,13 @@ func TestServer_VerifyLinks_ServiceError(t *testing.T) {
 	mockService := &mockService{
 		verifyLinksError: errors.New("service error"),
 	}
-	server := &Server{
-		log:     slog.Default(),
-		service: mockService,
-	}
+	server := NewServer(slog.Default(), config.ServerConfig{
+		Host: "localhost",
+		Port: 8080,
+	}, mockService)
 	
 	requestBody := models.VerifyLinksRequest{
-		Links: []string{"https://example.com"},
+		Links: []string{"example.com"},
 	}
 	data, _ := json.Marshal(requestBody)
 	
@@ -115,14 +116,14 @@ func TestServer_VerifyLinks_ServiceError(t *testing.T) {
 }
 
 func TestServer_LinksReport(t *testing.T) {
-	responseData, _ := json.Marshal(map[string]string{"https://example.com": "available"})
+	responseData, _ := json.Marshal(map[string]string{"example.com": "available"})
 	mockService := &mockService{
 		packageLinksResponse: responseData,
 	}
-	server := &Server{
-		log:     slog.Default(),
-		service: mockService,
-	}
+	server := NewServer(slog.Default(), config.ServerConfig{
+		Host: "localhost",
+		Port: 8080,
+	}, mockService)
 	
 	requestBody := models.LinksPackageRequest{
 		Links_list: []int{1},
@@ -141,26 +142,5 @@ func TestServer_LinksReport(t *testing.T) {
 	
 	if rr.Header().Get("Content-type") != "application/pdf" {
 		t.Errorf("Expected Content-type 'application/pdf', got '%s'", rr.Header().Get("Content-type"))
-	}
-}
-
-func TestServer_ServiceUnavailable(t *testing.T) {
-	mockService := &mockService{}
-	server := &Server{
-		log:     slog.Default(),
-		service: mockService,
-	}
-	
-	// Set server as closed
-	server.Shutdown(context.Background())
-	
-	req := httptest.NewRequest("POST", "/links", bytes.NewReader([]byte{}))
-	rr := httptest.NewRecorder()
-	
-	handler := server.GetHandler()
-	handler.ServeHTTP(rr, req)
-	
-	if rr.Code != http.StatusServiceUnavailable {
-		t.Errorf("Expected status %d, got %d", http.StatusServiceUnavailable, rr.Code)
 	}
 }

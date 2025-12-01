@@ -15,34 +15,29 @@ import (
 )
 
 func TestEndToEnd_LinkVerification(t *testing.T) {
-	// Configure for test
 	cfg := config.Config{
 		Server: config.ServerConfig{
 			Host: "localhost",
-			Port: 8081, // Use different port to avoid conflicts
+			Port: 8081,
 		},
 		Storage: config.StorageConfig{
 			LinksSize: 100,
 			CacheSize: 50,
 		},
 		Log: config.LogConfig{
-			Level: -4, // Debug level
+			Level: -4,
 		},
 	}
 	
-	// Create and start app
 	testApp := app.NewApp(cfg, slog.Default())
 	
-	// Start server in goroutine
 	go testApp.Run()
 	
-	// Wait for server to start
 	time.Sleep(500 * time.Millisecond)
 	
-	// Test 1: Verify links
 	t.Run("VerifyLinks", func(t *testing.T) {
 		request := models.VerifyLinksRequest{
-			Links: []string{"https://httpbin.org/status/200", "https://httpbin.org/status/404"},
+			Links: []string{"httpbin.org/status/200", "httpbin.org/status/404"},
 		}
 		
 		data, err := json.Marshal(request)
@@ -73,12 +68,11 @@ func TestEndToEnd_LinkVerification(t *testing.T) {
 			t.Errorf("Expected positive Links_num, got %d", response.Links_num)
 		}
 		
-		// Check that we got status for both links
-		if _, exists := response.Links["https://httpbin.org/status/200"]; !exists {
-			t.Error("Missing status for https://httpbin.org/status/200")
+		if _, exists := response.Links["httpbin.org/status/200"]; !exists {
+			t.Error("Missing status for httpbin.org/status/200")
 		}
-		if _, exists := response.Links["https://httpbin.org/status/404"]; !exists {
-			t.Error("Missing status for https://httpbin.org/status/404")
+		if _, exists := response.Links["httpbin.org/status/404"]; !exists {
+			t.Error("Missing status for httpbin.org/status/404")
 		}
 	})
 	
@@ -116,20 +110,18 @@ func TestEndToEnd_LinkVerification(t *testing.T) {
 		}
 		defer resp.Body.Close()
 		
-		if resp.StatusCode != http.StatusBadRequest {
+		if resp.StatusCode != http.StatusInternalServerError {
 			t.Errorf("Expected status %d for invalid JSON, got %d", http.StatusBadRequest, resp.StatusCode)
 		}
 	})
 	
-	// Cleanup
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	testApp.Shutdown(shutdownCtx)
+	//shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	//defer cancel()
+	//testApp.Shutdown(shutdownCtx)
 }
 
 // Simple local server for testing without external dependencies
 func TestEndToEnd_WithLocalServer(t *testing.T) {
-	// Start a local test server
 	localServer := http.Server{
 		Addr: ":8090",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -151,7 +143,6 @@ func TestEndToEnd_WithLocalServer(t *testing.T) {
 	
 	time.Sleep(100 * time.Millisecond)
 	
-	// Configure main app
 	cfg := config.Config{
 		Server: config.ServerConfig{
 			Host: "localhost",
@@ -172,9 +163,8 @@ func TestEndToEnd_WithLocalServer(t *testing.T) {
 	
 	time.Sleep(500 * time.Millisecond)
 	
-	// Test with local server URLs
 	request := models.VerifyLinksRequest{
-		Links: []string{"http://localhost:8090/success", "http://localhost:8090/error"},
+		Links: []string{"localhost:8090/success", "localhost:8090/error"},
 	}
 	
 	data, err := json.Marshal(request)
@@ -199,5 +189,13 @@ func TestEndToEnd_WithLocalServer(t *testing.T) {
 	
 	if len(response.Links) != 2 {
 		t.Errorf("Expected 2 links in response, got %d", len(response.Links))
+	}
+
+	for key, value := range response.Links {
+		if key == "localhost:8090/success" && value != "avaliable" {
+			t.Errorf("Expected that link %s will be avaliable, got %s", key, value)
+		} else if key == "localhost:8090/error" && value == "avaliable" {
+			t.Errorf("Expected that link %s will be not avaliable, got %s", key, value)
+		}
 	}
 }

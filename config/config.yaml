@@ -4,7 +4,7 @@ server:
 
 log:
   path: "./app.log"
-  level: 1
+  level: 0
 
 storage:
   links_size: 10000

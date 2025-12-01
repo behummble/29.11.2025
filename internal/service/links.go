@@ -222,6 +222,7 @@ func(svc *LinkService) linksStatus(status chan<- siteStatus, links []string) {
 			resp, err := svc.client.Get(fmt.Sprintf("http://%s", link))
 			siteStatus := siteStatus{
 				link: link,
+				status: statusAvaliable,
 			}
 			if err != nil {
 				svc.log.Error("Ping site error", slog.String("url", link), slog.String("error", err.Error()))
