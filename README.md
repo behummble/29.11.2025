@@ -75,7 +75,14 @@ sudo systemctl start website-checker
 ```
 
 ### Windows
+Если нет nssm, то поставить nssm, например:
 ```cmd
-sc create link_verifier binPath= "C:\path\to\link_verifier.exe"
-sc start link_verifier
+choco install nssm
+```
+далее
+```cmd
+go build -o path/to/your/executable/file
+```
+```cmd
+nssm.exe install link_verifier
 ```
