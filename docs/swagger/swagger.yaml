@@ -24,10 +24,6 @@ paths:
                 $ref: '#/components/schemas/VerifyLinksResponse'
         '500':
           description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
 
   /links/list:
     post:
@@ -49,16 +45,8 @@ paths:
                 format: binary
         '404':
           description: Links not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
         '500':
           description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
 
 components:
   schemas:
@@ -72,7 +60,7 @@ components:
           items:
             type: string
           description: Array of URLs to verify
-          example: ["https://example.com", "https://google.com"]
+          example: ["example.com", "google.com"]
 
     VerifyLinksResponse:
       type: object
@@ -83,8 +71,8 @@ components:
             type: string
           description: Hash table with URL as key and verification status as value
           example:
-            "https://example.com": "verified"
-            "https://google.com": "broken"
+            "https://example.com": "not avaliable"
+            "https://google.com": "avaliable"
         links_num:
           type: integer
           description: Number of links processed
